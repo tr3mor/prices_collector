@@ -7,7 +7,8 @@ import datetime
 import smtplib
 from email.mime.text import MIMEText
 import re
-
+import logging
+logging.basicConfig(level=logging, format='%(asctime)s %(message)s', filename='Parser_log.txt')
 
 # func to send email via gmail
 def send_email(mail_text):
@@ -22,7 +23,7 @@ def send_email(mail_text):
     msg['Bcc'] = ""
     server.sendmail(fromaddr, toaddrs, msg.as_string())
     server.quit()
-    print ("Email was sent")
+    logging.info("Email was sent")
     return 0
 
 
@@ -36,9 +37,9 @@ def Compare_prices(old_row, data, dict):
         change = float(old_row[x]) - float(data[x])
         if change != 0:
             if change > 0:
-                mail_text = mail_text + ("price for {} was decreased by {} <br />".format(dict[x], change))
+                mail_text = mail_text + ("price for {} was decreased by {} and now is {} <br />".format(dict[x], change, data[x]))
             if change < 0:
-                mail_text = mail_text + ("price for {} was increased by {} <br />".format(dict[x], change * (-1)))
+                mail_text = mail_text + ("price for {} was increased by {} and now  is {} <br />".format(dict[x], change * (-1), data[x]))
             count = count + 1
     if count > 0:
         return 1, mail_text
@@ -69,7 +70,7 @@ def inserting_data(next_seq, date, data, table_name):
     query = "INSERT into "+table_name+" VALUES (%s,%s,%s,%s,%s)"
 
     cursor.execute(query, tuple(data))
-    print('Info added to sql')
+    logging.info("Data '{}' have been added to SQL {}".format(data,table_name))
     return data
 
 def ulmart_parser(urls):
@@ -110,7 +111,7 @@ interes_urls = ["https://www.1c-interes.ru/catalog/all6968/23177156/"]
 date = datetime.datetime.now()
 date = date.strftime("%Y-%m-%d")
 
-
+logging.info("Daily script started")
 # sql part
 cnx = connection.MySQLConnection(user=db_user, password=db_user_pass,
                                  host=db_host,
@@ -118,7 +119,7 @@ cnx = connection.MySQLConnection(user=db_user, password=db_user_pass,
 cursor = cnx.cursor()
 
 #parsing
-data = []
+
 next_seq = 1
 
 
@@ -133,10 +134,7 @@ price_changed_ulmart, mail_text_ulmart = Compare_prices(ulmart_old_data, ulmart_
 # 1c_interes part
 # -------------------------------------------------------------------
 interes_data = interes_parser(interes_urls)
-for x in interes_data:
-    print(x)
 interes_old_data, interes_next_seq = get_last_raw('Interes')
-print (interes_next_seq)
 interes_data = inserting_data(interes_next_seq,date,interes_data,'Interes')
 price_changed_interes, mail_text_interes= Compare_prices(interes_old_data,interes_data,dict_of_interes)
 
@@ -145,5 +143,6 @@ cnx.close()
 
 if (price_changed_interes or price_changed_ulmart):
     send_email(mail_text_ulmart+mail_text_interes)
+logging.info("Daily script finished")
 
 
